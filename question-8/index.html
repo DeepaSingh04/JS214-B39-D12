@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dashboard</title>
+    <style>
+        /* CSS styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .search-bar {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        .search-input {
+            flex: 1;
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+        }
+        .search-button {
+            background-color: #4CAF50;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .search-button:hover {
+            background-color: #3e8e41;
+        }
+        .weather-data {
+            padding: 20px;
+        }
+        .weather-data h2 {
+            margin-top: 0;
+        }
+        .forecast {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        .forecast-item {
+            width: calc(33.33% - 10px);
+            margin: 10px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .forecast-item:hover {
+            background-color: #eee;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin: 20px;
+        }
+        .pagination-button {
+            background-color: #4CAF50;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .pagination-button:hover {
+            background-color: #3e8e41;
+        }
+        .theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #4CAF50;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .theme-toggle:hover {
+            background-color: #3e8e41;
+        }
+        /* Dark theme styles */
+        .dark-theme {
+            background-color: #333;
+            color: #fff;
+        }
+        .dark-theme .container {
+            background-color: #444;
+            border-color: #555;
+        }
+        .dark-theme .search-bar {
+            border-color: #555;
+        }
+        .dark-theme .search-input {
+            background-color: #444;
+            color: #fff;
+        }
+        .dark-theme .search-button {
+            background-color: #666;
+            color: #fff;
+        }
+        .dark-theme .weather-data {
+            color: #fff;
+        }
+        .dark-theme .forecast-item {
+            background-color: #444;
+            border-color: #555;
+        }
+        .dark-theme .pagination-button {
+            background-color: #666;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-bar">
+            <input type="text" id="search-input" class="search-input" placeholder="Search for a city">
+            <button id="search-button" class="search-button">Search</button>
+            <button id="theme-toggle" class="theme-toggle">Toggle theme</button>
+        </div>
+        <div class="weather-data">
+            <h2 id="city-name"></h2>
+            <p id="current-weather"></p>
+            <div class="forecast"></div>
+            <div class="pagination"></div>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript code
+        const API_KEY = 'YOUR_OPENWEATHERMAP_API_KEY';
+        const STORAGE_KEY = 'weather-dashboard';
+        let theme = localStorage.getItem('theme') || 'light';
+        let recentSearches = JSON.parse(localStorage.getItem('recentSearches') || '[]');
+      
+        let currentPage = 1;
+        let paginationEnabled = true;
+      
+        document.addEventListener('DOMContentLoaded', () => {
+          const searchInput = document.getElementById('search-input');
+          const searchButton = document.getElementById('search-button');
+          const themeToggle = document.getElementById('theme-toggle');
+          const cityNameElement = document.getElementById('city-name');
+          const currentWeatherElement = document.getElementById('current-weather');
+          const forecastElement = document.getElementById('forecast');
+          const paginationElement = document.getElementById('pagination');
+      
+          searchButton.addEventListener('click', handleSearch);
+          themeToggle.addEventListener('click', toggleTheme);
+          searchInput.addEventListener('input', debounce(handleSearch, 500));
+      
+          loadRecentSearches();
+          loadTheme();
+      
+          function handleSearch() {
+            const searchQuery = searchInput.value.trim();
+            if (searchQuery) {
+              fetchWeatherData(searchQuery);
+              saveRecentSearch(searchQuery);
+            }
+          }
+      
+          function fetchWeatherData(city) {
+            const url = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`;
+            fetch(url)
+              .then(response => response.json())
+              .then(data => {
+                const cityName = data.city.name;
+                const currentWeather = data.list[0].weather[0].description;
+                const forecastData = data.list.slice(0, 30);
+      
+                cityNameElement.textContent = cityName;
+                currentWeatherElement.textContent = currentWeather;
+                renderForecast(forecastData);
+              })
+              .catch(error => console.error(error));
+          }
+      
+          function renderForecast(forecastData) {
+            forecastElement.innerHTML = '';
+            forecastData.forEach((item, index) => {
+              const forecastItem = document.createElement('div');
+              forecastItem.className = 'forecast-item';
+              forecastItem.textContent = `${item.dt_txt} - ${item.weather[0].description}`;
+              forecastElement.appendChild(forecastItem);
+      
+              if (paginationEnabled && index >= 9) {
+                forecastItem.style.display = 'none';
+              }
+            });
+      
+            renderPagination(forecastData.length);
+          }
+      
+          function renderPagination(totalItems) {
+            paginationElement.innerHTML = '';
+            const totalPages = Math.ceil(totalItems / 10);
+            for (let i = 1; i <= totalPages; i++) {
+              const paginationButton = document.createElement('button');
+              paginationButton.className = 'pagination-button';
+              paginationButton.textContent = i;
+              paginationButton.addEventListener('click', () => {
+                currentPage = i;
+                renderForecast(forecastData);
+              });
+              paginationElement.appendChild(paginationButton);
+            }
+          }
+      
+          function toggleTheme() {
+            theme = theme === 'light' ? 'dark' : 'light';
+            localStorage.setItem('theme', theme);
+            loadTheme();
+          }
+      
+          function loadTheme() {
+            if (theme === 'dark') {
+              document.body.classList.add('dark-theme');
+            } else {
+              document.body.classList.remove('dark-theme');
+            }
+          }
+      
+          function saveRecentSearch(searchQuery) {
+            recentSearches.push(searchQuery);
+            localStorage.setItem('recentSearches', JSON.stringify(recentSearches));
+            loadRecentSearches();
+          }
+      
+          function loadRecentSearches() {
+            const recentSearchesElement = document.createElement('ul');
+            recentSearchesElement.innerHTML = '';
+            recentSearches.forEach(searchQuery => {
+              const searchItem = document.createElement('li');
+              searchItem.textContent = searchQuery;
+              recentSearchesElement.appendChild(searchItem);
+            });
+            document.body.appendChild(recentSearchesElement);
+          }
+      
+          function debounce(func, wait) {
+            let timeout;
+            return function() {
+              const context = this;
+              const args = arguments;
+              clearTimeout(timeout);
+              timeout = setTimeout(() => {
+                func.apply(context, args);
+              }, wait);
+            };
+          }
+        });
+      </script>
